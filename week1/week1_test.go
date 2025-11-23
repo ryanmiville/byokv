@@ -8,15 +8,16 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestServerWithTestdata tests the server using commands from the testdata file
 func TestServerWithTestdata(t *testing.T) {
 	// Parse testdata file
 	commands, err := parseTestdata("testdata/week1.txt")
-	if err != nil {
-		t.Fatalf("Failed to parse testdata: %v", err)
-	}
+	require.NoError(t, err, "Failed to parse testdata")
 
 	t.Logf("Loaded %d commands from testdata", len(commands))
 
@@ -30,32 +31,22 @@ func TestServerWithTestdata(t *testing.T) {
 		switch cmd.Operation {
 		case "PUT":
 			err := executePUT(handler, cmd.Key, cmd.Value)
-			if err != nil {
-				t.Errorf("Line %d: PUT %s %s failed: %v", lineNum, cmd.Key, cmd.Value, err)
-			}
+			assert.NoError(t, err, "Line %d: PUT %s %s failed", lineNum, cmd.Key, cmd.Value)
 
 		case "GET":
 			statusCode, body, err := executeGET(handler, cmd.Key)
-			if err != nil {
-				t.Errorf("Line %d: GET %s failed: %v", lineNum, cmd.Key, err)
-				continue
-			}
+			require.NoError(t, err, "Line %d: GET %s failed", lineNum, cmd.Key)
 
 			if cmd.Value == "NOT_FOUND" {
 				// Expect 404 status
-				if statusCode != http.StatusNotFound {
-					t.Errorf("Line %d: GET %s expected NOT_FOUND (404) but got status %d with body: %s",
-						lineNum, cmd.Key, statusCode, body)
-				}
+				assert.Equal(t, http.StatusNotFound, statusCode,
+					"Line %d: GET %s expected NOT_FOUND (404), got body: %s", lineNum, cmd.Key, body)
 			} else {
 				// Expect 200 status and matching value
-				if statusCode != http.StatusOK {
-					t.Errorf("Line %d: GET %s expected status 200 but got %d with body: %s",
-						lineNum, cmd.Key, statusCode, body)
-				} else if body != cmd.Value {
-					t.Errorf("Line %d: GET %s expected value %q but got %q",
-						lineNum, cmd.Key, cmd.Value, body)
-				}
+				assert.Equal(t, http.StatusOK, statusCode,
+					"Line %d: GET %s expected status 200, got body: %s", lineNum, cmd.Key, body)
+				assert.Equal(t, cmd.Value, body,
+					"Line %d: GET %s expected value mismatch", lineNum, cmd.Key)
 			}
 
 		default:
@@ -122,7 +113,7 @@ func executePUT(handler http.Handler, key, value string) error {
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
-		return fmt.Errorf("PUT failed with status %d: %s", rec.Code, rec.Body.String())
+		return fmt.Errorf("status %d: %s", rec.Code, rec.Body.String())
 	}
 
 	return nil
